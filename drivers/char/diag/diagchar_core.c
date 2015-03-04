@@ -1714,7 +1714,10 @@ static ssize_t diagchar_write(struct file *file, const char __user *buf,
 		&& (driver->logging_mode == USB_MODE) &&
 		(!driver->usb_connected))) {
 		/*Drop the diag payload */
+		// add by liuxuexin, pass write nv cmd even usb is not plug-in
+		if (pkt_type != CALLBACK_DATA_TYPE) {
 		return -EIO;
+		}
 	}
 #endif /* DIAG over USB */
 	if (pkt_type == DCI_DATA_TYPE) {

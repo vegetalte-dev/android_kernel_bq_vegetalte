@@ -102,11 +102,15 @@ enum msm_usb_phy_type {
 	SNPS_28NM_INTEGRATED_PHY,
 };
 
-#define IDEV_CHG_MAX	1500
+#if defined(CONFIG_L6140_COMMON) || defined(CONFIG_L8200_COMMON)|| defined(CONFIG_L6300_COMMON) || defined(CONFIG_L8700_COMMON)
+#define IDEV_CHG_MAX	1100
+#else
+#define IDEV_CHG_MAX	720
+#endif
 #define IDEV_CHG_MIN	500
 #define IUNIT		100
 
-#define IDEV_ACA_CHG_MAX	1500
+#define IDEV_ACA_CHG_MAX	700
 #define IDEV_ACA_CHG_LIMIT	500
 
 /**
@@ -283,6 +287,9 @@ struct msm_otg_platform_data {
 	bool enable_ahb2ahb_bypass;
 	bool disable_retention_with_vdd_min;
 	int usb_id_gpio;
+#if defined(CONFIG_L8200_COMMON) || defined(CONFIG_L8700_COMMON) || defined(CONFIG_L6300_COMMON)
+	int usbid_switch;
+#endif
 };
 
 /* phy related flags */

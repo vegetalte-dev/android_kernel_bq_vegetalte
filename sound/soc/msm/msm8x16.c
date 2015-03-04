@@ -34,6 +34,9 @@
 #include "../codecs/wcd9306.h"
 #define DRV_NAME "msm8x16-asoc-wcd"
 
+#ifdef CONFIG_LCT_SUPPORT_READ_MBHC_PLUG_TYPE
+char mbhc_plug_type[128] = {"NONE"};
+#endif
 #define BTSCO_RATE_8KHZ 8000
 #define BTSCO_RATE_16KHZ 16000
 #define MAX_SND_CARDS 3
@@ -57,7 +60,10 @@ static int msm_ter_mi2s_tx_ch = 1;
 static int msm_pri_mi2s_rx_ch = 1;
 
 static int msm_proxy_rx_ch = 2;
-
+#ifdef CONFIG_EXT_EARPHONE_PA
+static int cdc_ext_earphone_pa;
+static int cdc_ext_earphone_pa_pwr;	
+#endif
 static int msm8x16_enable_codec_ext_clk(struct snd_soc_codec *codec, int enable,
 					bool dapm);
 static int msm_snd_enable_codec_ext_clk(struct snd_soc_codec *codec, int enable,
@@ -144,8 +150,13 @@ void *def_tapan_mbhc_cal(void)
 	btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_V_BTN_LOW);
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
+#ifdef CONFIG_L8200_COMMON	
+	btn_low[0] = -50;
+	btn_high[0] = 100;
+#else
 	btn_low[0] = -50;
 	btn_high[0] = 20;
+#endif
 	btn_low[1] = 21;
 	btn_high[1] = 61;
 	btn_low[2] = 62;
@@ -1888,6 +1899,104 @@ static bool msm8x16_swap_gnd_mic(struct snd_soc_codec *codec)
 	return true;
 }
 
+#ifdef CONFIG_EXT_EARPHONE_PA
+int msm8x16_enable_ext_earphone_pa_pwr(u32 on)
+{
+	int retval = -1;
+	retval = gpio_direction_output(cdc_ext_earphone_pa, on);
+	if (retval) {
+		printk(KERN_ERR	
+			"%s unable to set direction for gpio[%d]\n", __func__,cdc_ext_earphone_pa);
+	}
+	return retval;
+}
+
+int msm8x16_enable_ext_earphone_pa(u32 on)
+{
+	int retval = -1;
+	retval = gpio_direction_output(cdc_ext_earphone_pa_pwr, on);
+	if (retval) {
+		printk(KERN_ERR	
+			"%s unable to set direction for gpio[%d]\n", __func__,cdc_ext_earphone_pa_pwr);
+	}
+	return retval;
+	
+}
+
+static int msm8x16_ext_earphone_power_amp_init(struct platform_device *pdev,
+			struct msm8916_asoc_mach_data *pdata)
+{
+	static bool already_init = false;
+	int retval = 0;
+
+	if(!already_init)
+	{
+		/* ext_earphone_pa pin gpio info */
+		cdc_ext_earphone_pa = of_get_named_gpio(pdev->dev.of_node,
+						"qcom,cdc_ext_earphone_pa", 0);
+		printk(KERN_ERR	"cdc_ext_earphone_pa  %d\n",	cdc_ext_earphone_pa);
+		if (cdc_ext_earphone_pa < 0) {
+			printk(KERN_ERR	"property %s in node %s not found %d\n",
+				"qcom,cdc_ext_earphone_pa", pdev->dev.of_node->full_name,
+				cdc_ext_earphone_pa);
+			return -EINVAL;
+		}
+		cdc_ext_earphone_pa_pwr = of_get_named_gpio(pdev->dev.of_node,
+						"qcom,cdc_ext_earphone_pa_pwr", 0);
+		printk(KERN_ERR	"cdc_ext_earphone_pa_pwr  %d\n",	cdc_ext_earphone_pa_pwr);
+		if (cdc_ext_earphone_pa_pwr < 0) {
+			printk(KERN_ERR	"property %s in node %s not found %d\n",
+				"qcom,cdc_ext_earphone_pa_pwr", pdev->dev.of_node->full_name,
+				cdc_ext_earphone_pa_pwr);
+			return -EINVAL;
+		}
+
+
+		
+		if (gpio_is_valid(cdc_ext_earphone_pa_pwr)) {
+			gpio_free(cdc_ext_earphone_pa_pwr);
+			/* configure cdc_ext_earphone_pa_pwr out gpio */
+			retval = gpio_request(cdc_ext_earphone_pa_pwr,
+					"cdc_ext_earphone_pa_pwr");
+			if (retval) {
+				printk(KERN_ERR	"%s unable to request gpio [%d]\n",__func__,
+					cdc_ext_earphone_pa_pwr);
+			}
+
+		}
+		else
+		{
+			printk(KERN_ERR	
+					"%s gpio[%d] is unvalid\n", __func__,cdc_ext_earphone_pa_pwr);
+		}
+		
+
+		if (gpio_is_valid(cdc_ext_earphone_pa)) {
+			/* configure cdc_ext_earphone_pa out gpio */
+			gpio_free(cdc_ext_earphone_pa);
+			retval = gpio_request(cdc_ext_earphone_pa,
+					"cdc_ext_earphone_pa");
+			if (retval) {
+				printk(KERN_ERR	"%s unable to request gpio [%d]\n",__func__,
+					cdc_ext_earphone_pa);
+			}
+
+		}
+		else
+		{
+			printk(KERN_ERR	
+					"%s gpio[%d] is unvalid\n", __func__,cdc_ext_earphone_pa);
+
+		}
+
+		already_init = true;
+	}
+
+	return retval;	  
+	
+}
+#endif
+
 static int msm8x16_setup_hs_jack(struct platform_device *pdev,
 			struct msm8916_asoc_mach_data *pdata)
 {
@@ -2032,6 +2141,40 @@ void populate_ext_snd_card_dailinks(struct platform_device *pdev)
 			msm8x16_9306_dai, sizeof(msm8x16_9306_dai));
 	}
 }
+
+#ifdef CONFIG_LCT_SUPPORT_READ_MBHC_PLUG_TYPE
+void wcd_mbhc_report_plug_type(const char *type)
+{
+	strcpy(mbhc_plug_type, type);
+}
+EXPORT_SYMBOL(wcd_mbhc_report_plug_type);
+static ssize_t msm8x16_mbhc_plug_type(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	ssize_t ret = 0;
+	sprintf(buf, "%s\n", mbhc_plug_type);
+	ret = strlen(buf) + 1;
+	return ret;
+}
+static DEVICE_ATTR(type, 0644, msm8x16_mbhc_plug_type, NULL);
+static struct kobject *msm8x16_mbhc;
+static int msm8x16_mbhc_plug_type_create_sysfs(void)
+{
+	int ret ;
+	msm8x16_mbhc = kobject_create_and_add("android_mbhc", NULL);
+	if (msm8x16_mbhc == NULL) {
+		pr_info("msm8x16_mbhc_plug_type_create_sysfs	failed!\n");
+		ret = -ENOMEM;
+		return ret ;
+	}
+	ret = sysfs_create_file(msm8x16_mbhc, &dev_attr_type.attr);
+	if (ret) {
+		pr_info("%s failed\n",__func__);
+		kobject_del(msm8x16_mbhc);
+	}
+	return 0 ;
+}
+#endif
 
 static int msm8x16_asoc_machine_probe(struct platform_device *pdev)
 {
@@ -2180,7 +2323,9 @@ static int msm8x16_asoc_machine_probe(struct platform_device *pdev)
 	pdata->lb_mode = false;
 
 	msm8x16_setup_hs_jack(pdev, pdata);
-
+#ifdef CONFIG_EXT_EARPHONE_PA
+	msm8x16_ext_earphone_power_amp_init(pdev, pdata);
+#endif
 	card->dev = &pdev->dev;
 	platform_set_drvdata(pdev, card);
 	snd_soc_card_set_drvdata(card, pdata);
@@ -2204,6 +2349,9 @@ static int msm8x16_asoc_machine_probe(struct platform_device *pdev)
 			ret);
 		goto err;
 	}
+#ifdef CONFIG_LCT_SUPPORT_READ_MBHC_PLUG_TYPE
+		msm8x16_mbhc_plug_type_create_sysfs();
+#endif
 	return 0;
 err:
 	devm_kfree(&pdev->dev, pdata);

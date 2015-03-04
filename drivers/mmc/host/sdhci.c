@@ -824,9 +824,14 @@ static u8 sdhci_calc_timeout(struct sdhci_host *host, struct mmc_command *cmd)
 	if (!data)
 		target_timeout = cmd->cmd_timeout_ms * 1000;
 	else {
-		target_timeout = data->timeout_ns / 1000;
-		if (host->clock)
-			target_timeout += data->timeout_clks / host->clock;
+		if (!data->timeout_ns && (host->quirks2 & SDHCI_QUIRK2_USE_RESERVED_MAX_TIMEOUT) &&
+				(host->clock > 400000)) {
+			return 0xE;
+		} else {
+			target_timeout = data->timeout_ns / 1000;
+			if (host->clock)
+				target_timeout += data->timeout_clks / host->clock;
+		}
 	}
 
 	/*
@@ -2191,6 +2196,10 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 	u16 ctrl;
 	int ret;
 
+#ifdef CONFIG_SMS_SIANO_IO_VOLTAGE_1P8
+	unsigned char	signal_voltage;		/* signalling voltage (1.8V or 3.3V) */
+#endif
+
 	/*
 	 * Signal Voltage Switching is only applicable for Host Controllers
 	 * v3.00 and above.
@@ -2200,7 +2209,24 @@ static int sdhci_do_start_signal_voltage_switch(struct sdhci_host *host,
 
 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 
+#ifdef CONFIG_SMS_SIANO_IO_VOLTAGE_1P8
+	if(host->mmc->index == 1)
+		pr_info("%s:%s set signal voltage to %d\n",
+			mmc_hostname(host->mmc), __func__, ios->signal_voltage);
+#endif
+
+#ifdef CONFIG_SMS_SIANO_IO_VOLTAGE_1P8
+	if(host->mmc->index == 1)
+		signal_voltage = MMC_SIGNAL_VOLTAGE_180;
+	else
+		signal_voltage = ios->signal_voltage;
+	if(host->mmc->index == 1)
+		pr_info("%s:%s force set signal voltage to %d\n",
+			mmc_hostname(host->mmc), __func__, signal_voltage);
+	switch (signal_voltage) {
+#else
 	switch (ios->signal_voltage) {
+#endif
 	case MMC_SIGNAL_VOLTAGE_330:
 		/* Set 1.8V Signal Enable in the Host Control2 register to 0 */
 		ctrl &= ~SDHCI_CTRL_VDD_180;

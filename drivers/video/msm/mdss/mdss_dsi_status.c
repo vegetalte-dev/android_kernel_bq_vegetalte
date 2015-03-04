@@ -30,7 +30,7 @@
 #include "mdss_panel.h"
 #include "mdss_mdp.h"
 
-#define STATUS_CHECK_INTERVAL_MS 5000
+#define STATUS_CHECK_INTERVAL_MS 2000 // tangshouxing 9.2
 #define STATUS_CHECK_INTERVAL_MIN_MS 200
 #define DSI_STATUS_CHECK_DISABLE 0
 
@@ -100,12 +100,12 @@ static int fb_event_callback(struct notifier_block *self,
 	pinfo = &ctrl_pdata->panel_data.panel_info;
 
 	if (!(pinfo->esd_check_enabled)) {
-		pr_debug("ESD check is not enaled in panel dtsi\n");
+		pr_info("ESD check is not enaled in panel dtsi\n");
 		return NOTIFY_DONE;
 	}
 
 	if (dsi_status_disable) {
-		pr_debug("%s: DSI status disabled\n", __func__);
+		pr_info("%s: DSI status disabled\n", __func__);
 		return NOTIFY_DONE;
 	}
 

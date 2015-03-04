@@ -10,7 +10,7 @@
  * GNU General Public License for more details.
  *
  */
-#define pr_fmt(fmt)	"CHG: %s: " fmt, __func__
+#define pr_fmt(fmt)	"qcom,qpnp-linear-charger: %s: " fmt, __func__
 
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -52,6 +52,7 @@
 #define CHG_IBAT_SAFE_REG			0x45
 #define CHG_VIN_MIN_REG				0x47
 #define CHG_CTRL_REG				0x49
+#define CHG_LED_SINK_REG			0x4D  // liyong2 2014.7.19
 #define CHG_ENABLE				BIT(7)
 #define CHG_FORCE_BATT_ON			BIT(0)
 #define CHG_EN_MASK				(BIT(7) | BIT(0))
@@ -206,6 +207,8 @@ struct vddtrim_map {
 	int			trim_val;
 };
 
+static struct qpnp_lbc_chip	*module_chip = NULL;
+
 /*
  * VDDTRIM is a 3 bit value which is split across two
  * register TRIM3(bit 5:4)	-> VDDTRIM bit(2:1)
@@ -351,6 +354,8 @@ struct qpnp_lbc_chip {
 	int				init_trim_uv;
 	struct alarm			vddtrim_alarm;
 	struct work_struct		vddtrim_work;
+	struct delayed_work		temp_work;
+    struct delayed_work		tp_work;
 	struct qpnp_lbc_irq		irqs[MAX_IRQS];
 	struct mutex			jeita_configure_lock;
 	struct mutex			chg_enable_lock;
@@ -615,6 +620,30 @@ static int qpnp_lbc_is_usb_chg_plugged_in(struct qpnp_lbc_chip *chip)
 
 	return (usbin_valid_rt_sts & USB_IN_VALID_MASK) ? 1 : 0;
 }
+
+#define QPNP_LBC_LED_SINK_ATC				0x00  // liyong2 2014.7.19
+#define QPNP_LBC_LED_SINK_FORCE_ON		0x01
+int qpnp_lbc_led_sink_set(int enable)
+{
+	struct qpnp_lbc_chip *chip;
+	u8 reg_val;
+	int rc;
+
+	if(module_chip==NULL)
+		return -ENXIO;
+
+	chip = module_chip;
+
+	reg_val = enable ? QPNP_LBC_LED_SINK_FORCE_ON : QPNP_LBC_LED_SINK_ATC;
+
+	rc = qpnp_lbc_write(chip, chip->chgr_base + CHG_LED_SINK_REG,
+				&reg_val, 1);
+	if (rc)
+		pr_err("Failed to set LED_SINK rc=%d\n", rc);
+
+	return rc;
+}
+EXPORT_SYMBOL(qpnp_lbc_led_sink_set);
 
 static int qpnp_lbc_charger_enable(struct qpnp_lbc_chip *chip, int reason,
 					int enable)
@@ -1171,6 +1200,54 @@ static int get_prop_capacity(struct qpnp_lbc_chip *chip)
 	return DEFAULT_CAPACITY;
 }
 
+int update_batt_for_lenovo_test(int real_temp , struct qpnp_lbc_chip *chip)
+{
+
+	pr_debug("wgz real temp = %d \n" , real_temp);
+
+	if(real_temp < 100)
+	{
+		real_temp -= 20;
+	}
+
+	if(real_temp < 60)	//map 70 to 0 and 230 to 230
+	{
+		real_temp = real_temp/3;
+	}
+	
+	else if(real_temp < 450 && real_temp > 400)
+	{
+		real_temp = (real_temp - 450)*2/5 + 450;
+	}
+
+	else if(real_temp < 320 && real_temp > 250)
+	{
+		real_temp = (real_temp - 250)*2/7 + 250;
+	}
+
+	else if(real_temp < 250 && real_temp > 210)
+	{
+		real_temp = (real_temp - 250)/2 + 250;
+	}
+	else if((real_temp>450)&&(real_temp<500)&&(!qpnp_lbc_is_usb_chg_plugged_in(chip)))
+	{
+		real_temp = (real_temp - 450)*2/5 + 450;
+	}
+
+	if(real_temp >= 580 && qpnp_lbc_is_usb_chg_plugged_in(chip) && real_temp<=670)
+	{
+		real_temp = 580;
+	}
+
+	pr_debug("wgz show_temp = %d\n" , real_temp );
+	return real_temp;
+}
+#ifdef CONFIG_LCT_CT300
+int use_scale_temp_for_lenovo_test = 1; 
+#else
+int use_scale_temp_for_lenovo_test = 0; 
+#endif
+
 #define DEFAULT_TEMP		250
 static int get_prop_batt_temp(struct qpnp_lbc_chip *chip)
 {
@@ -1191,6 +1268,23 @@ static int get_prop_batt_temp(struct qpnp_lbc_chip *chip)
 	return (int)results.physical;
 }
 
+static int
+get_prop_batt_temp_show(struct qpnp_lbc_chip *chip)
+{
+
+	int battery_temp = 250;
+	battery_temp = get_prop_batt_temp(chip);
+	if(use_scale_temp_for_lenovo_test)
+	{
+		battery_temp = update_batt_for_lenovo_test(battery_temp , chip);
+	}
+
+	return battery_temp;
+}
+
+static int charge_current = 0;
+module_param(charge_current , int , 0644);
+
 static void qpnp_lbc_set_appropriate_current(struct qpnp_lbc_chip *chip)
 {
 	unsigned int chg_current = chip->usb_psy_ma;
@@ -1203,9 +1297,26 @@ static void qpnp_lbc_set_appropriate_current(struct qpnp_lbc_chip *chip)
 		chg_current = min(chg_current,
 			chip->thermal_mitigation[chip->therm_lvl_sel]);
 
+	charge_current = chg_current;
 	pr_debug("setting charger current %d mA\n", chg_current);
 	qpnp_lbc_ibatmax_set(chip, chg_current);
 }
+
+#ifdef CONFIG_LCT_CT300
+ extern int charge_sensitivity_for_usb (int enable);
+ static void qpnp_tp_work(struct work_struct *work){
+    struct delayed_work *dwork = to_delayed_work(work);
+	struct qpnp_lbc_chip *chip = container_of(dwork,
+				struct qpnp_lbc_chip, tp_work);
+    
+    if (qpnp_lbc_is_usb_chg_plugged_in(chip)){
+        charge_sensitivity_for_usb(1);
+    }else{
+        charge_sensitivity_for_usb(0);
+    }
+    
+}
+#endif
 
 static void qpnp_batt_external_power_changed(struct power_supply *psy)
 {
@@ -1218,7 +1329,9 @@ static void qpnp_batt_external_power_changed(struct power_supply *psy)
 	spin_lock_irqsave(&chip->ibat_change_lock, flags);
 	if (!chip->bms_psy)
 		chip->bms_psy = power_supply_get_by_name("bms");
-
+    #ifdef CONFIG_LCT_CT300
+    schedule_delayed_work(&chip->tp_work,msecs_to_jiffies(1));
+    #endif
 	if (qpnp_lbc_is_usb_chg_plugged_in(chip)) {
 		chip->usb_psy->get_property(chip->usb_psy,
 				POWER_SUPPLY_PROP_CURRENT_MAX, &ret);
@@ -1512,7 +1625,7 @@ static int qpnp_batt_power_get_property(struct power_supply *psy,
 		val->intval = get_prop_battery_voltage_now(chip);
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
-		val->intval = get_prop_batt_temp(chip);
+		val->intval = get_prop_batt_temp_show(chip);;
 		break;
 	case POWER_SUPPLY_PROP_COOL_TEMP:
 		val->intval = chip->cfg_cool_bat_decidegc;
@@ -2018,10 +2131,11 @@ static int qpnp_lbc_is_batt_temp_ok(struct qpnp_lbc_chip *chip)
 	return (reg_val & BAT_TEMP_OK_IRQ) ? 1 : 0;
 }
 
+static int batt_temp_good = 1;
+
 static irqreturn_t qpnp_lbc_batt_temp_irq_handler(int irq, void *_chip)
 {
 	struct qpnp_lbc_chip *chip = _chip;
-	int batt_temp_good;
 
 	batt_temp_good = qpnp_lbc_is_batt_temp_ok(chip);
 	pr_debug("batt-temp triggered: %d\n", batt_temp_good);
@@ -2424,6 +2538,138 @@ static enum alarmtimer_restart vddtrim_callback(struct alarm *alarm,
 	return ALARMTIMER_NORESTART;
 }
 
+static int up_temp = 500;
+static int low_temp = 0;
+static int charger_status = 0;
+static int stoped_charger_real_temp = 0;
+static int temp_set = 0;
+extern int batt_temp_good;
+
+module_param(up_temp , int , 0644);
+module_param(low_temp , int , 0644);
+module_param(charger_status , int , 0644);// 0 ok ;1 temp too high 2 temp too low 
+
+static void suspend_charging_for_temp(struct qpnp_lbc_chip *chip)
+{
+	int before_temp = 0;
+	int after_temp = 0;
+	if(chip->cfg_charging_disabled == 0)
+	{
+		pr_err("temp high , disable charging \n");
+		chip->cfg_charging_disabled = 1;
+		temp_set = 1;
+		before_temp = get_prop_batt_temp(chip);
+		pr_err("before_temp = %d" , before_temp );
+        qpnp_lbc_charger_enable(chip, THERMAL, !chip->cfg_charging_disabled);
+		after_temp = get_prop_batt_temp(chip);
+		stoped_charger_real_temp = get_prop_batt_temp(chip);
+		pr_err("after_temp = %d" , after_temp );		
+	}
+}
+
+static void resume_charging_for_temp(struct qpnp_lbc_chip *chip)
+{
+	charger_status = 0;
+	if(temp_set != 0 || batt_temp_good != 1)
+	{
+		pr_err("temp ok , resume charging \n");
+		chip->cfg_charging_disabled = 0;
+		temp_set = 0;
+		batt_temp_good = 1;
+		qpnp_lbc_charger_enable(chip, THERMAL, !chip->cfg_charging_disabled);
+	}
+}
+static int
+qpnp_chg_is_batt_temp_too_high_too_low(struct qpnp_lbc_chip *chip)
+{
+	int temp;
+	int ibat_ma;
+	int vbat_mv;
+	struct timespec ts;
+	static struct timespec changed_ts = {0,0};
+	temp = get_prop_batt_temp(chip);
+	ibat_ma = get_prop_current_now(chip) / 1000;
+	vbat_mv = get_prop_battery_voltage_now(chip) / 1000;
+	get_monotonic_boottime(&ts);
+	pr_debug("current second = %ld , last changed_second = %ld\n" , ts.tv_sec , changed_ts.tv_sec);
+
+	pr_debug("batt_temp_good = %d,temp =%d , temp_set=%d stoped_charger_real_temp= %d"
+			",ibat_ma = %d vbat_mv = %d \n",
+				batt_temp_good,temp,temp_set , stoped_charger_real_temp , ibat_ma, vbat_mv );
+
+	if((ts.tv_sec - changed_ts.tv_sec < 300) && (changed_ts.tv_sec != 0))
+	{
+		return 0;
+	}
+
+	if(!qpnp_lbc_is_usb_chg_plugged_in(chip))
+	{
+		
+		resume_charging_for_temp(chip);
+		return 0;		
+	}
+	else
+	{
+		if(temp_set != 0)
+		{
+			if(temp < 250)
+			{
+				if(temp - stoped_charger_real_temp >= 10)
+				{
+					resume_charging_for_temp(chip);
+					get_monotonic_boottime(&changed_ts);
+				}
+			}
+			else 
+			{
+				if(temp - stoped_charger_real_temp <= -25)
+				{
+					resume_charging_for_temp(chip); 
+					get_monotonic_boottime(&changed_ts);
+				}
+			}
+		}
+		else
+		{
+            pr_debug("%s:before temp > up_temp\n",__func__);
+			if(temp > up_temp)
+			{
+                pr_debug("%s:enter temp > up_temp\n",__func__);
+				charger_status = 1;
+				suspend_charging_for_temp(chip);
+				get_monotonic_boottime(&changed_ts);
+			}
+			else if(temp < low_temp)
+			{
+				charger_status = 2; 
+				suspend_charging_for_temp(chip);
+				get_monotonic_boottime(&changed_ts);
+			}
+		}
+	}
+	return 0;
+}
+
+void qpnp_temp_work(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct qpnp_lbc_chip *chip = container_of(dwork,
+				struct qpnp_lbc_chip, temp_work);
+	int temp = get_prop_batt_temp(chip);
+	qpnp_chg_is_batt_temp_too_high_too_low(chip);
+
+	if(temp > 100 && temp < 400)
+	{
+		schedule_delayed_work(&chip->temp_work,
+			msecs_to_jiffies(10000));
+	}
+	else
+	{
+		schedule_delayed_work(&chip->temp_work,
+			msecs_to_jiffies(1000));
+	}
+}
+
 static int qpnp_lbc_probe(struct spmi_device *spmi)
 {
 	u8 subtype;
@@ -2447,6 +2693,7 @@ static int qpnp_lbc_probe(struct spmi_device *spmi)
 		return -ENOMEM;
 	}
 
+	module_chip = chip;
 	chip->usb_psy = usb_psy;
 	chip->dev = &spmi->dev;
 	chip->spmi = spmi;
@@ -2590,6 +2837,11 @@ static int qpnp_lbc_probe(struct spmi_device *spmi)
 		}
 	}
 
+	INIT_DELAYED_WORK(&chip->temp_work, qpnp_temp_work);
+	schedule_delayed_work(&chip->temp_work,msecs_to_jiffies(5000));
+    #ifdef CONFIG_LCT_CT300
+    INIT_DELAYED_WORK(&chip->tp_work, qpnp_tp_work);
+    #endif
 	if ((chip->cfg_cool_bat_decidegc || chip->cfg_warm_bat_decidegc)
 			&& chip->bat_if_base) {
 		chip->adc_param.low_temp = chip->cfg_cool_bat_decidegc;
@@ -2627,7 +2879,7 @@ static int qpnp_lbc_probe(struct spmi_device *spmi)
 	}
 
 	if (chip->cfg_charging_disabled && !get_prop_batt_present(chip))
-		pr_info("Battery absent and charging disabled !!!\n");
+		pr_debug("Battery absent and charging disabled !!!\n");
 
 	/* Configure initial alarm for VDD trim */
 	if ((chip->supported_feature_flag & VDD_TRIM_SUPPORTED) &&
@@ -2636,7 +2888,7 @@ static int qpnp_lbc_probe(struct spmi_device *spmi)
 		alarm_start_relative(&chip->vddtrim_alarm, kt);
 	}
 
-	pr_info("Probe chg_dis=%d bpd=%d usb=%d batt_pres=%d batt_volt=%d soc=%d\n",
+	pr_debug("Probe chg_dis=%d bpd=%d usb=%d batt_pres=%d batt_volt=%d soc=%d\n",
 			chip->cfg_charging_disabled,
 			chip->cfg_bpd_detection,
 			qpnp_lbc_is_usb_chg_plugged_in(chip),
@@ -2658,6 +2910,9 @@ static int qpnp_lbc_remove(struct spmi_device *spmi)
 {
 	struct qpnp_lbc_chip *chip = dev_get_drvdata(&spmi->dev);
 
+	#ifdef CONFIG_LCT_CT300
+    cancel_delayed_work(&chip->tp_work);
+    #endif
 	if (chip->supported_feature_flag & VDD_TRIM_SUPPORTED) {
 		alarm_cancel(&chip->vddtrim_alarm);
 		cancel_work_sync(&chip->vddtrim_work);
@@ -2669,6 +2924,39 @@ static int qpnp_lbc_remove(struct spmi_device *spmi)
 	dev_set_drvdata(&spmi->dev, NULL);
 	return 0;
 }
+
+static int
+qpnp_chg_ops_set(const char *val, const struct kernel_param *kp)
+{
+	return -EINVAL;
+}
+
+#define MAX_LEN_VADC	10
+static int
+qpnp_chg_usb_in_get(char *val, const struct kernel_param *kp)
+{
+	int rc = -1;
+	struct qpnp_vadc_result results;
+
+	if(module_chip != 0)
+	{
+		rc = qpnp_vadc_read(module_chip->vadc_dev, USBIN, &results);
+		if (rc) {
+			pr_err("Unable to read vchg rc=%d\n", rc);
+			return 0;
+		}
+		rc = snprintf(val, MAX_LEN_VADC, "%lld\n", results.physical);
+	}
+
+	return rc;
+}
+
+static struct kernel_param_ops usb_in_uv_param_ops = {
+	.set = qpnp_chg_ops_set,
+	.get = qpnp_chg_usb_in_get,
+};
+
+module_param_cb(usb_in_uv, &usb_in_uv_param_ops, NULL, 0644);
 
 static struct of_device_id qpnp_lbc_match_table[] = {
 	{ .compatible = QPNP_CHARGER_DEV_NAME, },

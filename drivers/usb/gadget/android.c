@@ -1582,8 +1582,29 @@ static int serial_function_bind_config(struct android_usb_function *f,
 	char *name, *xport_name = NULL;
 	char buf[32], *b, xport_name_buf[32], *tb;
 	int err = -1, i;
-	static int serial_initialized = 0, ports = 0;
+	static int serial_initialized = 0, ports = 0, org_ports = 0;
 	struct serial_function_config *config = f->config;
+	
+	struct android_dev *dev = cdev_to_android_dev(c->cdev);
+	struct android_configuration *conf;
+	struct android_usb_function_holder *f_holder;
+	int	   functions_no=0;
+	char   usb_function_string[32];
+	char * buff = usb_function_string;
+	
+	list_for_each_entry(conf, &dev->configs, list_item) {
+		list_for_each_entry(f_holder, &conf->enabled_functions, enabled_list) {
+			functions_no++;
+			buff += sprintf(buff, "%s,", f_holder->f->name);	
+			}
+		*(buff-1) = '\n';
+	}
+
+	if(!strncmp(usb_function_string, "ffs,diag,serial,mass_storage", 28) || !strncmp(usb_function_string, "diag,serial,mass_storage", 24)
+		|| !strncmp(usb_function_string, "diag,ffs,serial,mass_storage", 28))
+		ports = org_ports;
+	else
+		ports = 1;
 
 	if (serial_initialized)
 		goto bind_config;
@@ -1631,9 +1652,10 @@ static int serial_function_bind_config(struct android_usb_function *f,
 			goto err_gser_usb_get_function;
 		}
 	}
-	config->instances_on = ports;
+	org_ports = ports;
 
 bind_config:
+	config->instances_on = ports;
 	for (i = 0; i < ports; i++) {
 		err = usb_add_function(c, config->f_serial[i]);
 		if (err) {
@@ -1749,6 +1771,25 @@ static int mtp_function_ctrlrequest(struct android_usb_function *f,
 					struct usb_composite_dev *cdev,
 					const struct usb_ctrlrequest *c)
 {
+	// MTP MSFT OS Descriptor from mtk
+	struct android_dev *dev = cdev_to_android_dev(cdev);
+	struct android_configuration *conf;
+	struct android_usb_function_holder *f_holder;
+	int	   functions_no=0;
+	char   usb_function_string[32];
+	char * buff = usb_function_string;
+	
+	list_for_each_entry(conf, &dev->configs, list_item) {
+		list_for_each_entry(f_holder, &conf->enabled_functions, enabled_list) {
+			functions_no++;
+			buff += sprintf(buff, "%s,", f_holder->f->name);	
+			}
+		*(buff-1) = '\n';
+	}
+	
+	mtp_read_usb_functions(functions_no, usb_function_string);
+	// MTP MSFT OS Descriptor from mtk
+
 	return mtp_ctrlrequest(cdev, c);
 }
 
@@ -2214,17 +2255,23 @@ static int mass_storage_function_init(struct android_usb_function *f,
 		return -ENOMEM;
 	}
 
-	config->fsg.nluns = 1;
-	snprintf(name[0], MAX_LUN_NAME, "lun");
-	config->fsg.luns[0].removable = 1;
+	config->fsg.nluns = 0;
 
 	if (dev->pdata && dev->pdata->cdrom) {
 		config->fsg.luns[config->fsg.nluns].cdrom = 1;
 		config->fsg.luns[config->fsg.nluns].ro = 1;
 		config->fsg.luns[config->fsg.nluns].removable = 0;
+		config->fsg.luns[config->fsg.nluns].nofua = 1;
 		snprintf(name[config->fsg.nluns], MAX_LUN_NAME, "rom");
 		config->fsg.nluns++;
 	}
+
+	config->fsg.luns[config->fsg.nluns].cdrom = 0;
+	config->fsg.luns[config->fsg.nluns].ro = 0;
+	config->fsg.luns[config->fsg.nluns].removable = 1;
+	config->fsg.luns[config->fsg.nluns].nofua = 1;
+	snprintf(name[config->fsg.nluns], MAX_LUN_NAME, "lun");
+	config->fsg.nluns++;
 
 	if (uicc_nluns > FSG_MAX_LUNS - config->fsg.nluns) {
 		uicc_nluns = FSG_MAX_LUNS - config->fsg.nluns;
@@ -2320,7 +2367,28 @@ static void mass_storage_function_enable(struct android_usb_function *f)
 	int number_of_luns = 0;
 	char buf1[5];
 	char *lun_name = buf1;
-	static int msc_initialized;
+	static int msc_initialized = 0, init_common_nluns = 0;
+
+	struct android_dev *dev = cdev_to_android_dev(cdev);
+	struct android_configuration *conf;
+	struct android_usb_function_holder *f_holder;
+	int	   functions_no=0;
+	char   usb_function_string[32];
+	char * buff = usb_function_string;
+	
+	list_for_each_entry(conf, &dev->configs, list_item) {
+		list_for_each_entry(f_holder, &conf->enabled_functions, enabled_list) {
+			functions_no++;
+			buff += sprintf(buff, "%s,", f_holder->f->name);	
+			}
+		*(buff-1) = '\n';
+	}
+	init_common_nluns = config->fsg.nluns;
+
+	if(!strncmp(usb_function_string, "mtp,mass_storage,ffs", 20) || !strncmp(usb_function_string, "mtp,mass_storage", 16))
+		common->nluns  = 1;
+    else
+		common->nluns = init_common_nluns;
 
 	if (msc_initialized)
 		return;
@@ -2340,6 +2408,8 @@ static void mass_storage_function_enable(struct android_usb_function *f)
 					return;
 		}
 	} else {
+		init_common_nluns = config->fsg.nluns;
+
 		pr_debug("No extra msc lun required.\n");
 		return;
 	}
@@ -2361,6 +2431,7 @@ static void mass_storage_function_enable(struct android_usb_function *f)
 							(i-prev_nluns), err);
 	}
 
+	init_common_nluns = common->nluns;
 	msc_initialized = 1;
 }
 

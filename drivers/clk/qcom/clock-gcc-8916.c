@@ -1192,6 +1192,7 @@ static struct rcg_clk sdcc1_apps_clk_src = {
 static struct clk_freq_tbl ftbl_gcc_sdcc2_apps_clk[] = {
 	F(    144000,	      xo,  16,	  3,   25),
 	F(    400000,	      xo,  12,	  1,	4),
+	F(  15000000,	   gpll0,  16,	  3,	10),
 	F(  20000000,	   gpll0,  10,	  1,	4),
 	F(  25000000,	   gpll0,  16,	  1,	2),
 	F(  50000000,	   gpll0,  16,	  0,	0),

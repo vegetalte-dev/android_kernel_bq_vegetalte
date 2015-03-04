@@ -620,6 +620,18 @@ int32_t msm_sensor_driver_probe(void *setting)
 	/*Save sensor info*/
 	s_ctrl->sensordata->cam_slave_info = slave_info;
 
+	msm_sensor_init_device_name();
+	msm_sensor_set_module_info(s_ctrl);
+	
+	#if YUV_SENSOR_REGISTER_AS_DEV_VIDEO2
+	printk("is_yuv_sensor == %d\n",is_yuv_sensor);
+	if(is_yuv_sensor)
+	{
+		printk("we probe yuv sensor here\n");
+		msm_yuv_sensor_platform_probe(tmp_pdev,tmp_data);
+	}
+	#endif
+
 	return rc;
 
 CAMERA_POWER_DOWN:

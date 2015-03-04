@@ -476,6 +476,9 @@ exit:
 	pr_debug("%s: Impedance detection completed\n", __func__);
 }
 
+#ifdef CONFIG_LCT_SUPPORT_READ_MBHC_PLUG_TYPE
+extern void wcd_mbhc_report_plug_type(const char *type);
+#endif
 static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 				enum snd_jack_types jack_type)
 {
@@ -590,6 +593,20 @@ static void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 		wcd_mbhc_clr_and_turnon_hph_padac(mbhc);
 	}
 	pr_debug("%s: leave hph_status %x\n", __func__, mbhc->hph_status);
+#ifdef CONFIG_LCT_SUPPORT_READ_MBHC_PLUG_TYPE
+	if (	mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET)
+		{
+	wcd_mbhc_report_plug_type("HEADSET");
+		}
+	else if (	mbhc->current_plug == MBHC_PLUG_TYPE_HEADPHONE)
+		{
+	wcd_mbhc_report_plug_type("HEADPHONE");
+		}
+	else
+		{
+	wcd_mbhc_report_plug_type("NONE");
+	}
+#endif	
 }
 
 static void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
@@ -838,6 +855,10 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 					 */
 					pr_debug("%s: switch didnt work\n",
 						  __func__);
+// xuke @ 20140822	These projects have no switch to swap groud & mic pins, then treated as headphone.
+#if defined(CONFIG_L6140_COMMON) || defined(CONFIG_L6300_COMMON) || defined(CONFIG_L8200_COMMON) || defined(CONFIG_L8700_COMMON)
+					plug_type = MBHC_PLUG_TYPE_HEADPHONE;
+#endif
 					goto report;
 				} else if (mbhc->mbhc_cfg->swap_gnd_mic) {
 					pr_debug("%s: US_EU gpio present, flip switch\n",
@@ -1443,8 +1464,13 @@ irqreturn_t wcd_mbhc_btn_press_handler(int irq, void *data)
 	mask = wcd_mbhc_get_button_mask(result1);
 	mbhc->buttons_pressed |= mask;
 	wcd9xxx_spmi_lock_sleep();
-	if (schedule_delayed_work(&mbhc->mbhc_btn_dwork,
-				msecs_to_jiffies(400)) == 0) {
+    // xuke @ 20140823	More delay to optimize the issue that there will get a long press if the headset pluged out very slowly.
+#if defined(CONFIG_L6140_COMMON) || defined(CONFIG_L6300_COMMON) || defined(CONFIG_L8200_COMMON) || defined(CONFIG_L8700_COMMON) || defined(CONFIG_LCT_CT300)
+	if (schedule_delayed_work(&mbhc->mbhc_btn_dwork, msecs_to_jiffies(1000)) == 0)
+#else
+	if (schedule_delayed_work(&mbhc->mbhc_btn_dwork, msecs_to_jiffies(400)) == 0)
+#endif
+	{
 		WARN(1, "Button pressed twice without release event\n");
 		wcd9xxx_spmi_unlock_sleep();
 	}
@@ -1702,6 +1728,14 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 		ret = snd_jack_set_key(mbhc->button_jack.jack,
 				       SND_JACK_BTN_0,
 				       KEY_MEDIA);
+
+        // xuke @ 20140823	Set the value of headset button.
+#if defined(CONFIG_L6140_COMMON) || defined(CONFIG_L6300_COMMON) || defined(CONFIG_L8200_COMMON)  //|| defined(CONFIG_L8700_COMMON) //delete it for hook key error, yinhaitao, 20140822
+		ret = snd_jack_set_key(mbhc->button_jack.jack,
+					   SND_JACK_BTN_1,
+					   KEY_MEDIA);
+#endif
+
 		if (ret) {
 			pr_err("%s: Failed to set code for btn-0\n",
 				__func__);

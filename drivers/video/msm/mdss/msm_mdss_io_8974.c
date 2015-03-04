@@ -28,6 +28,8 @@
 
 static struct dsi_clk_desc dsi_pclk;
 
+int devices_flag=1;
+
 int mdss_dsi_clk_init(struct platform_device *pdev,
 	struct mdss_dsi_ctrl_pdata *ctrl)
 {
@@ -324,6 +326,7 @@ static int mdss_dsi_link_clk_prepare(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 
 	rc = clk_prepare(ctrl_pdata->byte_clk);
 	if (rc) {
+		devices_flag=0;
 		pr_err("%s: Failed to prepare dsi byte clk\n", __func__);
 		goto byte_clk_err;
 	}
