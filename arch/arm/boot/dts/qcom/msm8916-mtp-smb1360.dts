@@ -34,6 +34,7 @@
 
 			qcom,empty-soc-disabled;
 			qcom,chg-inhibit-disabled;
+			qcom,shdn-after-pwroff;
 			qcom,float-voltage-mv = <4200>;
 			qcom,iterm-ma = <200>;
 			qcom,charging-disabled;
