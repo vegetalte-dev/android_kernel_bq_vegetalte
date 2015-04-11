@@ -3741,6 +3741,15 @@ static void i2c_msm_rsrcs_clk_teardown(struct i2c_msm_ctrl *ctrl)
 	i2c_msm_clk_path_teardown(ctrl);
 }
 
+#if 1		// xuke @ 20140707		Used in msg21xx driver.
+void lct_qup_i2c_use_custom_clk(struct i2c_adapter *adap, u32 clk)
+{
+	struct i2c_msm_ctrl *ctrl = i2c_get_adapdata(adap);
+
+	ctrl->rsrcs.clk_freq_out = clk;
+}
+#endif
+
 #ifdef CONFIG_DEBUG_FS
 /*
  * i2c_msm_dbgfs_clk_wrapper: take care of clocks before calling func
