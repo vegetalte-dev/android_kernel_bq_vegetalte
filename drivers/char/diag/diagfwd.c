@@ -1147,6 +1147,14 @@ int diag_process_apps_pkt(unsigned char *buf, int len)
 		/* Not required, represents that command isnt sent to modem */
 		return 0;
 	}
+	else if((cpu_is_msm8x60() || cpu_is_msm8916() || chk_apps_master()) &&( (*buf == 0x29) && (*(buf+1) == 0x2))) { 
+		/* call reset API */ 
+		printk(KERN_CRIT "diag: reset mode set, Rebooting SoC.....\n"); 
+		msm_set_restart_mode(RESTART_NORMAL); 
+		kernel_restart(NULL); 
+		/* Not required, represents that command isnt sent to modem */ 
+		return 0; 
+	}
 	/* Check for polling for Apps only DIAG */
 	else if ((*buf == 0x4b) && (*(buf+1) == 0x32) &&
 		(*(buf+2) == 0x03)) {
