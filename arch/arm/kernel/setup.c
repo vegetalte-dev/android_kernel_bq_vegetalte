@@ -60,6 +60,7 @@
 
 #include "atags.h"
 
+int is_tp_driver_loaded = 0;
 
 #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
 char fpe_type[8];
@@ -104,6 +105,11 @@ EXPORT_SYMBOL(boot_reason);
 
 unsigned int cold_boot;
 EXPORT_SYMBOL(cold_boot);
+
+//++++>
+char android_boot_mode[16];
+EXPORT_SYMBOL(android_boot_mode);
+//<++++ xuke @ 20140911		Get charger mode used in the probe function of TP driver.
 
 char* (*arch_read_hardware_id)(void);
 EXPORT_SYMBOL(arch_read_hardware_id);

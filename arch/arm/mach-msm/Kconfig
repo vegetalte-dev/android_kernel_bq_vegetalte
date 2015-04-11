@@ -349,6 +349,34 @@ config ARCH_MSM8226
 	select MSM_IRQ
 endmenu
 
+menu "LCT Customer of Project Selection"
+
+config L8700_COMMON
+    depends on ARCH_MSM8916
+    depends on !MSM_STACKED_MEMORY
+    default n
+    bool "Longcheer L8700 board"
+    help
+        Support for the L8700 longcheer board.
+	
+config EXT_EARPHONE_PA
+    depends on ARCH_MSM8916
+    depends on !MSM_STACKED_MEMORY
+    default n
+    bool "Longcheer EXT_EARPHONE_PA"
+    help
+        Support for the L8700 longcheer EXT_EARPHONE_PA.
+
+config LCT_SUPPORT_READ_MBHC_PLUG_TYPE
+    depends on ARCH_MSM8916
+    depends on !MSM_STACKED_MEMORY
+    default n
+    bool "Longcheer LCT_SUPPORT_READ_MBHC_PLUG_TYPE"
+    help
+        Support for the L8700 longcheer LCT_SUPPORT_READ_MBHC_PLUG_TYPE.
+        		
+endmenu
+
 config MSM_KRAIT_TBB_ABORT_HANDLER
 	bool "Krait TBB/TBH data abort handler"
 	depends on ARCH_MSM_KRAIT
