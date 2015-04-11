@@ -47,7 +47,7 @@
 extern void *gCELLBuffAddr;
 #endif
 
-int sms_debug = 0;
+int sms_debug = 3;
 module_param_named(debug, sms_debug, int, 0644);
 MODULE_PARM_DESC(debug, "set debug level (info=1, adv=2 (or-able))");
 
@@ -2517,9 +2517,10 @@ void sms_chip_plug(int plugin)
 
 	if (plugin) {
 		sms_chip_poweron();
+		sms_info("call sms_chip_poweron for chip power on wait sdio detect\n");
 #ifdef SMS_SDIO_DRV
 		sms_sdio_plug_notify(plugin);
-		msleep(50);
+		msleep(200);
 #endif
 	} else {
 #ifdef SMS_SDIO_DRV
