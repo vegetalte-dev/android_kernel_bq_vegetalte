@@ -31,6 +31,8 @@
 #define SCM_ERROR		-1
 #define SCM_INTERRUPTED		1
 #define SCM_EBUSY		-55
+#define SCM_EBUSY_WAIT_MS   30
+#define SCM_EBUSY_MAX_RETRY 20
 #define SCM_V2_EBUSY		-12
 
 static DEFINE_MUTEX(scm_lock);
@@ -744,7 +746,7 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
 		void *resp_buf, size_t resp_len)
 {
 	struct scm_command *cmd;
-	int ret;
+	int ret,retry_count = 0;
 	size_t len = SCM_BUF_LEN(cmd_len, resp_len);
 
 	if (cmd_len > len || resp_len > len)
@@ -754,8 +756,13 @@ int scm_call(u32 svc_id, u32 cmd_id, const void *cmd_buf, size_t cmd_len,
 	if (!cmd)
 		return -ENOMEM;
 
-	ret = scm_call_common(svc_id, cmd_id, cmd_buf, cmd_len, resp_buf,
-				resp_len, cmd, len);
+	do {
+		memset(cmd, 0, PAGE_ALIGN(len));
+		ret = scm_call_common(svc_id, cmd_id, cmd_buf, cmd_len,resp_buf, resp_len, cmd, len);
+		if (ret == SCM_EBUSY)
+			msleep(SCM_EBUSY_WAIT_MS);
+	} while (ret == SCM_EBUSY && (retry_count++ < SCM_EBUSY_MAX_RETRY));
+
 	if (unlikely(ret == SCM_EBUSY))
 		ret = _scm_call_retry(svc_id, cmd_id, cmd_buf, cmd_len,
 				      resp_buf, resp_len, cmd, PAGE_ALIGN(len));
