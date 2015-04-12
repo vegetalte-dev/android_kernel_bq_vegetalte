@@ -404,6 +404,8 @@ int of_batterydata_read_data(struct device_node *batterydata_container_node,
 	int delta, best_delta, batt_id_kohm, rpull_up_kohm,
 		vadc_vdd_uv, best_id_kohm, i, rc = 0;
 
+    char battery_type_in_use[] = "vk_4v2_2250mah";
+
 	node = batterydata_container_node;
 	OF_PROP_READ(rpull_up_kohm, "rpull-up-kohm", node, rc, false);
 	OF_PROP_READ(vadc_vdd_uv, "vref-batt-therm", node, rc, false);
@@ -423,6 +425,7 @@ int of_batterydata_read_data(struct device_node *batterydata_container_node,
 		rc = of_batterydata_read_batt_id_kohm(node,
 						"qcom,batt-id-kohm",
 						&batt_ids);
+#if 0
 		if (rc)
 			continue;
 		for (i = 0; i < batt_ids.num; i++) {
@@ -433,6 +436,22 @@ int of_batterydata_read_data(struct device_node *batterydata_container_node,
 				best_id_kohm = batt_ids.kohm[i];
 			}
 		}
+#else
+        // avoid compile warning
+        (void) i;
+        (void) delta;
+        
+        rc = of_property_read_string(node, "qcom,battery-type",
+                &battery_type);
+        if (rc)
+            continue;
+
+        if(!strcmp(battery_type,battery_type_in_use))
+        {
+            best_node = node;
+            break;
+        }
+#endif
 	}
 
 	if (best_node == NULL) {
