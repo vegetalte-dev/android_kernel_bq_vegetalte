@@ -299,6 +299,7 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
 			 mrq->sbc->arg, mrq->sbc->flags);
 	}
 
+	if(host->index == 1)
 	pr_debug("%s: starting CMD%u arg %08x flags %08x\n",
 		 mmc_hostname(host), mrq->cmd->opcode,
 		 mrq->cmd->arg, mrq->cmd->flags);
@@ -1529,6 +1530,7 @@ void mmc_set_ios(struct mmc_host *host)
 {
 	struct mmc_ios *ios = &host->ios;
 
+	if(host->index == 1)
 	pr_debug("%s: clock %uHz busmode %u powermode %u cs %u Vdd %u "
 		"width %u timing %u\n",
 		 mmc_hostname(host), ios->clock, ios->bus_mode,
@@ -1944,25 +1946,29 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
 	if (!host->ops->start_signal_voltage_switch)
 		return -EPERM;
 	if (!host->ops->card_busy)
-		pr_warning("%s: cannot verify signal voltage switch\n",
+		pr_info("%s: cannot verify signal voltage switch\n",
 				mmc_hostname(host));
 
-	cmd.opcode = SD_SWITCH_VOLTAGE;
-	cmd.arg = 0;
-	cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+    if(host->index != 1 ) {
+	    cmd.opcode = SD_SWITCH_VOLTAGE;
+	    cmd.arg = 0;
+	    cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+	}
 
 	/*
 	 * Hold the clock reference so clock doesn't get auto gated during this
 	 * voltage switch sequence.
 	 */
 	mmc_host_clk_hold(host);
-	err = mmc_wait_for_cmd(host, &cmd, 0);
-	if (err)
-		goto exit;
+	if(host->index != 1 ) {
+	    err = mmc_wait_for_cmd(host, &cmd, 0);
+	    if (err)
+		    goto exit;
 
-	if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR)) {
-		err = -EIO;
-		goto exit;
+	    if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR)) {
+		    err = -EIO;
+		    goto exit;
+		}
 	}
 
 	/*
@@ -1970,9 +1976,11 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
 	 * after the response of cmd11, but wait 1 ms to be sure
 	 */
 	mmc_delay(1);
-	if (host->ops->card_busy && !host->ops->card_busy(host)) {
-		err = -EAGAIN;
-		goto power_cycle;
+	if(host->index != 1 ) {
+	    if (host->ops->card_busy && !host->ops->card_busy(host)) {
+		    err = -EAGAIN;
+		    goto power_cycle;
+		}
 	}
 	/*
 	 * During a signal voltage level switch, the clock must be gated
@@ -2008,12 +2016,14 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage)
 	 * Failure to switch is indicated by the card holding
 	 * dat[0:3] low
 	 */
-	if (host->ops->card_busy && host->ops->card_busy(host))
-		err = -EAGAIN;
+	if(host->index != 1 ) {
+	    if (host->ops->card_busy && host->ops->card_busy(host))
+		     err = -EAGAIN;
+    }
 
 power_cycle:
 	if (err) {
-		pr_debug("%s: Signal voltage switch failed, "
+		pr_info("%s: Signal voltage switch failed, "
 			"power cycling card\n", mmc_hostname(host));
 		mmc_power_cycle(host);
 	}
@@ -2102,7 +2112,14 @@ void mmc_power_up(struct mmc_host *host)
 	mmc_delay(10);
 
 	/* Set signal voltage to 3.3V */
+#ifdef CONFIG_SMS_SIANO_IO_VOLTAGE_1P8
+	if(host->index == 1)
+		__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_180);
+	else
+		__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330);
+#else
 	__mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_330);
+#endif
 
 	mmc_host_clk_release(host);
 }
@@ -3259,6 +3276,8 @@ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
 		mmc_hostname(host), __func__, host->f_init);
 #endif
 	mmc_power_up(host);
+	if(host->index == 1)
+		mmc_delay(100);
 
 	/*
 	 * Some eMMCs (with VCCQ always on) may not be reset after power up, so
@@ -3314,7 +3333,7 @@ int _mmc_detect_card_removed(struct mmc_host *host)
 
 	if (ret) {
 		mmc_card_set_removed(host->card);
-		pr_debug("%s: card remove detected\n", mmc_hostname(host));
+		pr_info("%s: card remove detected and ret is %d\n", mmc_hostname(host), ret);
 	}
 
 	return ret;
