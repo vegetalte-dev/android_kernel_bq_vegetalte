@@ -95,7 +95,7 @@ module_param(lpm_disconnect_thresh , uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(lpm_disconnect_thresh,
 	"Delay before entering LPM on USB disconnect");
 
-static bool floated_charger_enable;
+static bool floated_charger_enable = true;
 module_param(floated_charger_enable , bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(floated_charger_enable,
 	"Whether to enable floated charger");
@@ -3020,7 +3020,7 @@ static void msm_otg_sm_work(struct work_struct *w)
 					break;
 				case USB_FLOATED_CHARGER:
 					msm_otg_notify_charger(motg,
-							IDEV_CHG_MAX);
+							IDEV_CHG_MIN);
 					pm_runtime_put_noidle(otg->phy->dev);
 					pm_runtime_suspend(otg->phy->dev);
 					break;
@@ -3740,6 +3740,11 @@ static irqreturn_t msm_otg_irq(int irq, void *data)
 	return ret;
 }
 
+#ifdef CONFIG_TOUCHSCREEN_FT5X06
+extern struct work_struct usbdetect_on;
+extern struct work_struct usbdetect_off;
+#endif
+
 static void msm_otg_set_vbus_state(int online)
 {
 	struct msm_otg *motg = the_msm_otg;
@@ -3747,10 +3752,16 @@ static void msm_otg_set_vbus_state(int online)
 
 	if (online) {
 		pr_debug("PMIC: BSV set\n");
+#ifdef CONFIG_TOUCHSCREEN_FT5X06
+		schedule_work(&usbdetect_on);
+#endif
 		if (test_and_set_bit(B_SESS_VLD, &motg->inputs) && init)
 			return;
 	} else {
 		pr_debug("PMIC: BSV clear\n");
+#ifdef CONFIG_TOUCHSCREEN_FT5X06
+		schedule_work(&usbdetect_off);
+#endif
 		if (!test_and_clear_bit(B_SESS_VLD, &motg->inputs) && init)
 			return;
 	}
@@ -4801,7 +4812,16 @@ struct msm_otg_platform_data *msm_otg_dt_to_pdata(struct platform_device *pdev)
 	pdata->usb_id_gpio = of_get_named_gpio(node, "qcom,usbid-gpio", 0);
 	if (pdata->usb_id_gpio < 0)
 		pr_debug("usb_id_gpio is not available\n");
-
+#ifdef CONFIG_L8700_COMMON
+	pdata->usbid_switch = of_get_named_gpio(node, "qcom,usbid-switch", 0);
+	if (pdata->usb_id_gpio < 0)
+		pr_debug("usbid_switch is not available\n");
+	else
+	{
+		gpio_request(pdata->usbid_switch, "USB_ID_SWITCH");
+		gpio_direction_output(pdata->usbid_switch, 1);
+	}
+#endif
 	pdata->l1_supported = of_property_read_bool(node,
 				"qcom,hsusb-l1-supported");
 	pdata->enable_ahb2ahb_bypass = of_property_read_bool(node,
