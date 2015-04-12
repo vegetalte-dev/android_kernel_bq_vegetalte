@@ -723,10 +723,6 @@ static void cpr_scale(struct cpr_regulator *cpr_vreg,
 				& RBCPR_RESULT0_ERROR_STEPS_MASK;
 	last_volt = cpr_vreg->last_volt[corner];
 
-	cpr_debug_irq(cpr_vreg,
-			"last_volt[corner:%d, fuse_corner:%d] = %d uV\n",
-			corner, fuse_corner, last_volt);
-
 	gcnt = cpr_read(cpr_vreg, REG_RBCPR_GCNT_TARGET
 			(cpr_vreg->cpr_fuse_ro_sel[fuse_corner]));
 	quot = gcnt & ((1 << RBCPR_GCNT_TARGET_GCNT_SHIFT) - 1);
@@ -819,9 +815,6 @@ static void cpr_scale(struct cpr_regulator *cpr_vreg,
 			error_steps = max(cpr_vreg->down_threshold,
 					cpr_vreg->vdd_apc_step_down_limit);
 		}
-		cpr_debug_irq(cpr_vreg,
-			      "Down: cpr status = 0x%08x (error_steps=%d)\n",
-			      reg_val, error_steps);
 
 		if (last_volt <= cpr_vreg->floor_volt[corner]) {
 			cpr_debug_irq(cpr_vreg,
@@ -846,10 +839,6 @@ static void cpr_scale(struct cpr_regulator *cpr_vreg,
 		}
 
 		if (error_steps > cpr_vreg->vdd_apc_step_down_limit) {
-			cpr_debug_irq(cpr_vreg,
-				      "%d is over down-limit(%d): Clamp\n",
-				      error_steps,
-				      cpr_vreg->vdd_apc_step_down_limit);
 			error_steps = cpr_vreg->vdd_apc_step_down_limit;
 		}
 
@@ -882,9 +871,6 @@ static void cpr_scale(struct cpr_regulator *cpr_vreg,
 		/* Ack */
 		cpr_irq_clr_ack(cpr_vreg);
 
-		cpr_debug_irq(cpr_vreg,
-		"DOWN: -> new_volt[corner:%d, fuse_corner:%d] = %d uV\n",
-			corner, fuse_corner, new_volt);
 	}
 }
 
@@ -898,8 +884,6 @@ static irqreturn_t cpr_irq_handler(int irq, void *dev)
 	reg_val = cpr_read(cpr_vreg, REG_RBIF_IRQ_STATUS);
 	if (cpr_vreg->flags & FLAGS_IGNORE_1ST_IRQ_STATUS)
 		reg_val = cpr_read(cpr_vreg, REG_RBIF_IRQ_STATUS);
-
-	cpr_debug_irq(cpr_vreg, "IRQ_STATUS = 0x%02X\n", reg_val);
 
 	if (!cpr_ctl_is_enabled(cpr_vreg)) {
 		cpr_debug_irq(cpr_vreg, "CPR is disabled\n");
