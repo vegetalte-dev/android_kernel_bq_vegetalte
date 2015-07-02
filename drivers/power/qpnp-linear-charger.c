@@ -1625,7 +1625,7 @@ static int qpnp_batt_power_get_property(struct power_supply *psy,
 		val->intval = get_prop_battery_voltage_now(chip);
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
-		val->intval = get_prop_batt_temp_show(chip);;
+		val->intval = get_prop_batt_temp_show(chip);
 		break;
 	case POWER_SUPPLY_PROP_COOL_TEMP:
 		val->intval = chip->cfg_cool_bat_decidegc;
