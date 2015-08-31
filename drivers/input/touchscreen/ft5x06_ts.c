@@ -1802,9 +1802,9 @@ static ssize_t fts_gesture_proc_read(struct file *file, char __user *buf, size_t
     char *page = NULL;
 	page = kzalloc(FT_FW_NAME_MAX_LEN, GFP_KERNEL);
 	if(ft5x06_gesture_open)
-		cnt = sprintf(page,  "FT5x06 gesture open\n");
+		cnt = sprintf(page,  "1");
 	else
-		cnt = sprintf(page,  "FT5x06 gesture close\n");
+		cnt = sprintf(page,  "0");
 	cnt = simple_read_from_buffer(buf, size, ppos, page, cnt);
 	kfree(page);
 	return cnt;
