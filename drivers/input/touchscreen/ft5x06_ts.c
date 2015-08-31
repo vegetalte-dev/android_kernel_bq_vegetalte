@@ -260,7 +260,7 @@ struct work_struct usbdetect_off;
 static struct proc_dir_entry *gesture_proc = NULL;
 static struct timer_list ft5x06_gesture_timer;
 static char ft5x06_gesture_state;
-static char ft5x06_gesture_open=1;
+static char ft5x06_gesture_open=0;
 #endif
 
 static int ft5x06_i2c_read(struct i2c_client *client, char *writebuf,
