@@ -67,12 +67,7 @@ void adreno_drawctxt_dump(struct kgsl_device *device,
 	kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_CONSUMED, &start);
 	kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_RETIRED, &retire);
 
-	/*
-	 * We may have cmdbatch timer running, which also uses same
-	 * lock, take a lock with software interrupt disabled (bh)
-	 * to avoid spin lock recursion.
-	 */
-	spin_lock_bh(&drawctxt->lock);
+	spin_lock(&drawctxt->lock);
 	dev_err(device->dev,
 		"  context[%d]: queue=%d, submit=%d, start=%d, retire=%d\n",
 		context->id, queue, drawctxt->submitted_timestamp,
@@ -126,7 +121,7 @@ stats:
 	dev_err(device->dev, "  context[%d]: submit times: %s\n",
 		context->id, buf);
 
-	spin_unlock_bh(&drawctxt->lock);
+	spin_unlock(&drawctxt->lock);
 }
 
 /**
