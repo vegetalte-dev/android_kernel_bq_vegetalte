@@ -1068,7 +1068,8 @@ static int kgsl_close_device(struct kgsl_device *device)
 		/* Fail if the wait times out */
 		BUG_ON(atomic_read(&device->active_cnt) > 0);
 
-		result = kgsl_pwrctrl_change_state(device, KGSL_STATE_INIT);
+		result = device->ftbl->stop(device);
+		kgsl_pwrctrl_change_state(device, KGSL_STATE_INIT);
 	}
 	mutex_unlock(&device->mutex);
 	return result;
@@ -1159,10 +1160,8 @@ static int kgsl_open_device(struct kgsl_device *device)
 	}
 	device->open_count++;
 err:
-	if (result) {
-		kgsl_pwrctrl_change_state(device, KGSL_STATE_INIT);
+	if (result)
 		atomic_dec(&device->active_cnt);
-	}
 
 	mutex_unlock(&device->mutex);
 	return result;
