@@ -1497,6 +1497,71 @@ static int smb1360_battery_is_writeable(struct power_supply *psy,
 	return rc;
 }
 
+/*lct.mshuai modify 2015-01-08*/
+static int BatteryTestStatus_enable = 0;
+
+static ssize_t smb1360_battery_test_status_show(struct device *dev,
+					struct device_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", BatteryTestStatus_enable);
+}
+
+static ssize_t smb1360_battery_test_status_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int retval;
+	unsigned int input;
+
+	if (sscanf(buf, "%u", &input) != 1) {
+		retval = -EINVAL;
+        BatteryTestStatus_enable = 0;
+		goto exit;
+	}
+
+	if (input != 1) {
+		retval = -EINVAL;
+        BatteryTestStatus_enable = 0;
+		goto exit;
+	}
+
+    BatteryTestStatus_enable = 1;
+
+
+exit:
+	return retval;
+}
+static struct device_attribute attrs[] = {
+	__ATTR(BatteryTestStatus, S_IRUGO | S_IWUSR | S_IWGRP,
+			smb1360_battery_test_status_show,
+			smb1360_battery_test_status_store),
+};
+void runin_work(struct smb1360_chip *chip, int batt_capacity)
+{
+    int rc;
+
+    printk("%s:BatteryTestStatus_enable = %d chip->usb_present = %d \n",__func__,BatteryTestStatus_enable,chip->usb_present);
+    if (!chip->usb_present || !BatteryTestStatus_enable){
+        return;
+    }
+
+	if (batt_capacity > 80) {
+        pr_debug("smb1360_get_prop_batt_capacity > 80\n");
+        rc = smb1360_charging_disable(chip, USER, true);
+        if (rc)
+			dev_err(chip->dev,
+				"Couldn't disenable charge rc=%d\n", rc);
+	}else {
+	    if (batt_capacity < 60) {
+	    pr_debug("smb1360_get_prop_batt_capacity < 60\n");
+	    rc = smb1360_charging_disable(chip, USER, false);
+        if (rc)
+			dev_err(chip->dev,
+				"Couldn't enable charge rc=%d\n", rc);
+	    }
+	}
+}
+/*add by lct.mshuai @20150108*/
+
 static int smb1360_battery_get_property(struct power_supply *psy,
 				       enum power_supply_property prop,
 				       union power_supply_propval *val)
@@ -1522,6 +1587,7 @@ static int smb1360_battery_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		val->intval = smb1360_get_prop_batt_capacity(chip);
+                runin_work(chip, val->intval);//add by lct.mshuai @20150108
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
 		val->intval = smb1360_get_prop_chg_full_design(chip);
@@ -1783,6 +1849,37 @@ static int usbin_uv_handler(struct smb1360_chip *chip, u8 rt_stat)
 		/* USB inserted */
 		chip->usb_present = usb_present;
 		power_supply_set_present(chip->usb_psy, usb_present);
+	}
+
+	return 0;
+}
+
+static int usbin_ov_handler(struct smb1360_chip *chip, u8 rt_stat)
+{
+	/*
+	 * rt_stat indicates if usb is overvolted. If so usb_present
+	 * should be marked removed
+	 */
+	bool usb_present = !rt_stat;
+	int health;
+
+	printk("chip->usb_present = %d usb_present = %d\n",
+			chip->usb_present, usb_present);
+	if (chip->usb_present && !usb_present) {
+		/* USB removed */
+		chip->usb_present = usb_present;
+        printk("setting usb psy type = %d\n",
+				POWER_SUPPLY_TYPE_UNKNOWN);
+		power_supply_set_supply_type(chip->usb_psy,
+				POWER_SUPPLY_TYPE_UNKNOWN);
+		power_supply_set_present(chip->usb_psy, usb_present);
+	}
+
+	if (chip->usb_psy) {
+		health = rt_stat ? POWER_SUPPLY_HEALTH_OVERVOLTAGE
+					: POWER_SUPPLY_HEALTH_GOOD;
+        printk("POWER_SUPPLY_HEALTH_OVERVOLTAGE = 5 POWER_SUPPLY_HEALTH_GOOD = 1 health=%d \n", health);
+		power_supply_set_health_state(chip->usb_psy, health);
 	}
 
 	return 0;
@@ -2158,6 +2255,7 @@ static struct irq_handler_info handlers[] = {
 			},
 			{
 				.name		= "usbin_ov",
+                                .smb_irq	= usbin_ov_handler,
 			},
 			{
 				.name		= "unused",
@@ -3120,7 +3218,8 @@ disable_fg_reset:
 	 */
 	if (!(chip->workaround_flags & WRKRND_FG_CONFIG_FAIL)) {
 		if (chip->delta_soc != -EINVAL) {
-			reg = abs(((chip->delta_soc * MAX_8_BITS) / 100) - 1);
+			//reg = abs(((chip->delta_soc * MAX_8_BITS) / 100) - 1);
+                        reg = 0x01;//optimization for report soc changed irq,please to set "qcom,fg-delta-soc" int dts to open this prop
 			pr_debug("delta_soc=%d reg=%x\n", chip->delta_soc, reg);
 			rc = smb1360_write(chip, SOC_DELTA_REG, reg);
 			if (rc) {
@@ -4334,6 +4433,19 @@ static int smb1360_probe(struct i2c_client *client,
 	chip->batt_psy.external_power_changed = smb1360_external_power_changed;
 	chip->batt_psy.property_is_writeable = smb1360_battery_is_writeable;
 
+        /*lct.mshuai modify @20150108*/
+        rc = sysfs_create_file(&chip->client->dev.kobj,
+				&attrs[0].attr);
+	    if (rc < 0) {
+		    dev_err(&chip->client->dev,
+				    "%s: Failed to create sysfs attributes\n",
+				    __func__);
+             sysfs_remove_file(&chip->client->dev.kobj,
+				&attrs[0].attr);
+	}
+
+        /*lct.mshuai modify @20150108*/
+
 	rc = power_supply_register(chip->dev, &chip->batt_psy);
 	if (rc < 0) {
 		dev_err(&client->dev,
@@ -4499,7 +4611,10 @@ static int smb1360_remove(struct i2c_client *client)
 	mutex_destroy(&chip->otp_gain_lock);
 	mutex_destroy(&chip->fg_access_request_lock);
 	debugfs_remove_recursive(chip->debug_root);
-
+        /*add by lct.mshuai @20150108*/
+        sysfs_remove_file(&chip->client->dev.kobj,
+	    &attrs[0].attr);
+        /*add by lct.mshuai @20150108*/
 	return 0;
 }
 
