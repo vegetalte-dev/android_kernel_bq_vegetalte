@@ -1768,8 +1768,28 @@ static int serial_function_bind_config(struct android_usb_function *f,
 	char *name, *xport_name = NULL;
 	char buf[32], *b, xport_name_buf[32], *tb;
 	int err = -1, i;
-	static int serial_initialized = 0, ports = 0;
+        static int serial_initialized = 0, ports = 0, org_ports = 0;
 	struct serial_function_config *config = f->config;
+	
+	struct android_dev *dev = cdev_to_android_dev(c->cdev);
+	struct android_configuration *conf;
+	struct android_usb_function_holder *f_holder;
+	char   usb_function_string[32];
+	char * buff = usb_function_string;
+	
+	list_for_each_entry(conf, &dev->configs, list_item) {
+		list_for_each_entry(f_holder, &conf->enabled_functions, enabled_list) {
+			buff += sprintf(buff, "%s,", f_holder->f->name);	
+			}
+		*(buff-1) = '\n';
+	}
+
+	if(!strncmp(usb_function_string, "ffs,diag,serial,mass_storage", 28) || !strncmp(usb_function_string, "diag,serial,mass_storage", 24)
+		|| !strncmp(usb_function_string, "diag,ffs,serial,mass_storage", 28) || !strncmp(usb_function_string, "diag,serial,rmnet,ffs", 20)
+		|| !strncmp(usb_function_string, "diag,serial,rmnet", 17))
+		ports = org_ports;
+	else
+		ports = 1;
 
 	if (serial_initialized)
 		goto bind_config;
@@ -1817,9 +1837,10 @@ static int serial_function_bind_config(struct android_usb_function *f,
 			goto err_gser_usb_get_function;
 		}
 	}
-	config->instances_on = ports;
+	org_ports = ports;
 
 bind_config:
+        config->instances_on = ports;
 	for (i = 0; i < ports; i++) {
 		err = usb_add_function(c, config->f_serial[i]);
 		if (err) {
