@@ -830,5 +830,28 @@ config SENSORS_BMI058
 	 If you say yes here, you get support for Bosch Sensortec's
 	 sensor driver of BMI058.
 
+config SENSORS_BMM050
+	tristate "BMM050 Magnetic Sensor Driver"
+	depends on I2C
+	help
+	 If you say yes here, you get support for Bosch Sensortec's
+	 sensor BMM050 Magnetic Sensor
+
+config SENSORS_BMG
+        tristate "Bosch Gyroscope Sensor Driver"
+        depends on I2C
+        help
+         If you say yes here, you get support for Bosch Sensortec's
+         gyroscope sensor drivers of BMG160/BMI055/BMI058 e.t.c.
+
+config SENSORS_BMG_FIFO
+	tristate "Bosch Gyroscope FIFO Support"
+	depends on SENSORS_BMG
+	help
+	If you say yes here, you get support for Gyroscope sensor FIFO operations.
+
+config FTS_GESTURE
+	bool "FT5x06 doble tap"
+
 endif
 
