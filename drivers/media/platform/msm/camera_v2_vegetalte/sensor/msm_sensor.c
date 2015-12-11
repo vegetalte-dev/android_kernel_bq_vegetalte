@@ -1324,7 +1324,7 @@ int msm_sensor_check_id(struct msm_sensor_ctrl_t *s_ctrl)
 	else
 		rc = msm_sensor_match_id(s_ctrl);
 	if( (rc == 0) && (s_ctrl->sensordata->sensor_name != NULL) 
-		&&( (strcmp(s_ctrl->sensordata->sensor_name,"imx214_8916_cm9886qr") == 0) ) )
+		&&(strcmp(s_ctrl->sensordata->sensor_name,"imx214_8916_cm9886qr") == 0)
 	{
 		pr_err("%s:g_imx214_otp_module_id = %x\n", __func__,g_imx214_otp_module_id);
 		if((strcmp(s_ctrl->sensordata->sensor_name,"imx214_8916_cm9886qr") == 0) 
@@ -1332,7 +1332,7 @@ int msm_sensor_check_id(struct msm_sensor_ctrl_t *s_ctrl)
 			&& (g_otp_driver_ic_id == 0x02) ) // ADI driver IC by gpg
 		{
 			pr_err("%s:it is imx214_8916_cm9886qr\n", __func__);	
-		}
+		}	
 		else
 		{
 			pr_err("%s:it is not support imx214 s_ctrl->sensordata->sensor_name =%s\n", __func__,s_ctrl->sensordata->sensor_name);
