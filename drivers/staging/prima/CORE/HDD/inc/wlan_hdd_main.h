@@ -1074,6 +1074,12 @@ struct hdd_adapter_s
    spinlock_t lock_for_active_session;
    /* Time stamp for start RoC request */
    v_TIME_t startRocTs;
+
+   /* Time stamp for last completed RoC request */
+   v_TIME_t lastRocTs;
+
+   /* work queue to defer the back to back p2p_listen */
+   struct delayed_work roc_work;
 };
 
 #define WLAN_HDD_GET_STATION_CTX_PTR(pAdapter) (&(pAdapter)->sessionCtx.station)
@@ -1349,6 +1355,8 @@ struct hdd_context_s
      * IP
      */
     struct notifier_block ipv4_notifier;
+    //Lock to avoid race condition during wmm operations
+    struct mutex   wmmLock;
 };
 
 
@@ -1514,5 +1522,7 @@ VOS_STATUS wlan_hdd_init_channels_for_cc(hdd_context_t *pHddCtx,  driver_load_ty
 
 VOS_STATUS wlan_hdd_cancel_remain_on_channel(hdd_context_t *pHddCtx);
 
-void hdd_nullify_netdev_ops(hdd_context_t *pHddCtx);
+VOS_STATUS wlan_hdd_handle_dfs_chan_scan(hdd_context_t *pHddCtx,
+                                   tANI_U8 dfsScanMode);
+
 #endif    // end #if !defined( WLAN_HDD_MAIN_H )

@@ -57,7 +57,7 @@
 #include "limSession.h"
 #include "vos_nvitem.h"
 #ifdef WLAN_FEATURE_11W
-#include "wniCfgAp.h"
+#include "wniCfg.h"
 #endif
 
 /* Static global used to mark situations where pMac->lim.gLimTriggerBackgroundScanDuringQuietBss is SET
@@ -5972,14 +5972,25 @@ tSirRetStatus limPostMlmAddBAReq( tpAniSirGlobal pMac,
           FL( "Requesting ADDBA with Cisco 1225 AP, window size 25"));
       pMlmAddBAReq->baBufferSize = MAX_BA_WINDOW_SIZE_FOR_CISCO;
   }
+  else if (pMac->miracastVendorConfig)
+  {
+      if (wlan_cfgGetInt(pMac, WNI_CFG_NUM_BUFF_ADVERT , &val) != eSIR_SUCCESS)
+      {
+           limLog(pMac, LOGE, FL("Unable to get WNI_CFG_NUM_BUFF_ADVERT"));
+           status = eSIR_FAILURE;
+           goto returnFailure;
+      }
+
+      pMlmAddBAReq->baBufferSize = val;
+  }
   else
       pMlmAddBAReq->baBufferSize = 0;
 
   limLog( pMac, LOGW,
-      FL( "Requesting an ADDBA to setup a %s BA session with STA %d for TID %d" ),
+      FL( "Requesting an ADDBA to setup a %s BA session with STA %d for TID %d buff = %d" ),
       (pMlmAddBAReq->baPolicy ? "Immediate": "Delayed"),
       pStaDs->staIndex,
-      tid );
+      tid, pMlmAddBAReq->baBufferSize );
 
   // BA Timeout
   if (wlan_cfgGetInt(pMac, WNI_CFG_BA_TIMEOUT, &val) != eSIR_SUCCESS)
@@ -8366,6 +8377,7 @@ void limParseBeaconForTim(tpAniSirGlobal pMac,tANI_U8* pRxPacketInfo, tpPESessio
     }
     return;
 }
+
 void limDecrementPendingMgmtCount (tpAniSirGlobal pMac)
 {
     if( pMac->sys.gSysBbtPendingMgmtCount )
