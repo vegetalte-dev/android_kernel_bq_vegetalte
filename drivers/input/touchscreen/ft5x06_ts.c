@@ -188,7 +188,7 @@
 #define PINCTRL_STATE_SUSPEND	"pmx_ts_suspend"
 #define PINCTRL_STATE_RELEASE	"pmx_ts_release"
 
-#define FW_AUTO_UPGRADE	0
+#define FW_AUTO_UPGRADE	1
 
 enum {
 	FT_BLOADER_VERSION_LZ4 = 0,
@@ -791,6 +791,7 @@ pwr_off_fail:
 	return err;
 }
 
+static bool usb_online = false;
 static int ft5x06_ts_resume(struct device *dev)
 {
 	struct ft5x06_ts_data *data = dev_get_drvdata(dev);
@@ -832,6 +833,9 @@ static int ft5x06_ts_resume(struct device *dev)
 	}
 
 	msleep(data->pdata->soft_rst_dly);
+
+	if (usb_online)
+		ft5x0x_write_reg(data->client,FT_REG_FREQ_HOP,0x01);
 
 	enable_irq(data->client->irq);
 
@@ -1780,6 +1784,7 @@ void ft5x06_usbdetect_on(struct work_struct *w)
 		ft5x0x_write_reg(data->client,FT_REG_FREQ_HOP,0x01);
 		printk(KERN_ERR  "%s %d : reg 0x8B hase set to 0x01\n",__func__,__LINE__);
 	}
+	usb_online = true;
 }
 
 void ft5x06_usbdetect_off(struct work_struct *w)
@@ -1793,6 +1798,7 @@ void ft5x06_usbdetect_off(struct work_struct *w)
 		ft5x0x_write_reg(data->client,FT_REG_FREQ_HOP,0x0);
 		printk(KERN_ERR  "%s %d : reg 0x8B hase set to 0x00\n",__func__,__LINE__);
 	}
+	usb_online = false;
 }
 
 #ifdef CONFIG_FTS_GESTURE
