@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2014 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -36,7 +36,7 @@
  *
  */
 #include "palTypes.h"
-#include "wniCfgSta.h"
+#include "wniCfg.h"
 #include "aniGlobal.h"
 #include "sirApi.h"
 #include "sirParams.h"
@@ -660,6 +660,12 @@ void limCovertChannelScanType(tpAniSirGlobal pMac,tANI_U8 channelNum, tANI_BOOLE
     if (len > WNI_CFG_SCAN_CONTROL_LIST_LEN)
     {
         limLog(pMac, LOGE, FL("Invalid scan control list length:%d"), len);
+        return ;
+    }
+    if (pMac->fActiveScanOnDFSChannels)
+    {
+        limLog(pMac, LOG1, FL("DFS feature triggered,"
+                              "block scan type conversion"));
         return ;
     }
     for (i=0; (i+1) < len; i+=2)
