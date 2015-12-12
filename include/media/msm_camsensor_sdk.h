@@ -5,7 +5,11 @@
 
 #define KVERSION 0x1
 
+#ifdef CONFIG_MACH_BQ_VEGETALTE_LP
+#define MAX_POWER_CONFIG      14
+#else
 #define MAX_POWER_CONFIG      12
+#endif
 #define GPIO_OUT_LOW          (0 << 1)
 #define GPIO_OUT_HIGH         (1 << 1)
 #define CSI_EMBED_DATA        0x12
@@ -63,6 +67,7 @@ enum msm_sensor_power_seq_type_t {
 	SENSOR_I2C,
 };
 
+#ifndef CONFIG_MACH_BQ_VEGETALTE_LP
 enum msm_camera_qup_i2c_write_batch_size_t {
 	MSM_CAMERA_I2C_BATCH_SIZE_1 = 1,
 	MSM_CAMERA_I2C_BATCH_SIZE_2,
@@ -76,6 +81,7 @@ enum msm_camera_qup_i2c_write_batch_t {
 	MSM_CAMREA_I2C_BATCH_DISABLE = 0,
 	MSM_CAMERA_I2C_BATCH_ENABLE,
 };
+#endif
 
 enum msm_camera_i2c_reg_addr_type {
 	MSM_CAMERA_I2C_BYTE_ADDR = 1,
@@ -152,6 +158,11 @@ enum msm_actuator_addr_type {
 enum msm_actuator_write_type {
 	MSM_ACTUATOR_WRITE_HW_DAMP,
 	MSM_ACTUATOR_WRITE_DAC,
+	MSM_ACTUATOR_WRITE_DAC_DW9800,
+	MSM_ACTUATOR_WRITE_DAC_DW9761,
+	// add for AK7345
+	MSM_ACTUATOR_WRITE_DAC_AK7345,
+	// end for AK7345
 };
 
 enum msm_actuator_i2c_operation {
@@ -180,11 +191,13 @@ enum msm_flash_cfg_type_t {
 	CFG_FLASH_HIGH,
 };
 
+#ifndef CONFIG_MACH_BQ_VEGETALTE_LP
 enum msm_sensor_output_format_t {
 	MSM_SENSOR_BAYER,
 	MSM_SENSOR_YCBCR,
 	MSM_SENSOR_META,
 };
+#endif
 
 struct msm_sensor_power_setting {
 	enum msm_sensor_power_seq_type_t seq_type;
@@ -232,7 +245,9 @@ struct msm_camera_sensor_slave_info {
 	uint8_t  is_init_params_valid;
 	struct msm_sensor_init_params sensor_init_params;
 	uint8_t is_flash_supported;
+#ifndef CONFIG_MACH_BQ_VEGETALTE_LP
 	enum msm_sensor_output_format_t output_format;
+#endif
 };
 
 struct msm_camera_i2c_reg_array {
@@ -247,7 +262,9 @@ struct msm_camera_i2c_reg_setting {
 	enum msm_camera_i2c_reg_addr_type addr_type;
 	enum msm_camera_i2c_data_type data_type;
 	uint16_t delay;
+#ifndef CONFIG_MACH_BQ_VEGETALTE_LP
 	enum msm_camera_qup_i2c_write_batch_t qup_i2c_batch;
+#endif
 };
 
 struct msm_camera_csid_vc_cfg {
@@ -312,8 +329,10 @@ struct region_params_t {
 	*/
 	uint16_t step_bound[2];
 	uint16_t code_per_step;
+#ifndef CONFIG_MACH_BQ_VEGETALTE_LP
 	/* qvalue for converting float type numbers to integer format */
 	uint32_t qvalue;
+#endif
 };
 
 struct reg_settings_t {

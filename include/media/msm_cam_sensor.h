@@ -314,7 +314,9 @@ struct msm_camera_sensor_slave_info32 {
 	uint8_t  is_init_params_valid;
 	struct msm_sensor_init_params sensor_init_params;
 	uint8_t is_flash_supported;
+#ifndef CONFIG_MACH_BQ_VEGETALTE_LP
 	enum msm_sensor_output_format_t output_format;
+#endif
 };
 
 struct msm_camera_csid_lut_params32 {
@@ -412,6 +414,9 @@ enum msm_actuator_cfg_type_t {
 	CFG_ACTUATOR_POWERDOWN,
 	CFG_ACTUATOR_POWERUP,
 	CFG_ACTUATOR_INIT,
+// add by gpg
+	CFG_AK7345_ACTUATOR_SET_OTP_TUNE,
+//
 };
 
 enum msm_ois_cfg_type_t {
@@ -532,6 +537,13 @@ struct msm_actuator_set_position_t {
 	uint16_t delay[MAX_NUMBER_OF_STEPS];
 };
 
+// add by gpg
+struct ak7345_actuator_otp_info_t {
+	uint16_t m_inf_code;
+	uint16_t m_macro_code;
+};
+// end by gpg
+
 struct msm_actuator_cfg_data {
 	int cfgtype;
 	uint8_t is_af_supported;
@@ -541,6 +553,9 @@ struct msm_actuator_cfg_data {
 		struct msm_actuator_get_info_t get_info;
 		struct msm_actuator_set_position_t setpos;
 		enum af_camera_name cam_name;
+		// add by gpg
+		struct ak7345_actuator_otp_info_t ak7345_otp_info;
+		// end by gpg
 	} cfg;
 };
 

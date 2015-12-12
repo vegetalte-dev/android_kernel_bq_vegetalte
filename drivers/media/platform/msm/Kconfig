@@ -27,15 +27,25 @@ menuconfig MSMB_CAMERA
 	  adds support for the camera driver stack including sensor, isp
 	  and postprocessing drivers.
 
+config MACH_BQ_VEGETALTE_LP
+        bool "Qualcomm MSM camera and video capture 2.0 support"
+        depends on MSMB_CAMERA
+        ---help---
+          Say Y here to use the 5.0.2 version of camera_v2
+
 config MSMB_CAMERA_DEBUG
 	bool "Qualcomm MSM camera 2.0 debugging with printk"
 	depends on MSMB_CAMERA
 	---help---
 	  Enable printk() debug for msm camera 2.0
 
-if MSMB_CAMERA
+if (MSMB_CAMERA && !MACH_BQ_VEGETALTE_LP)
 source "drivers/media/platform/msm/camera_v2/Kconfig"
-endif # MSMB_CAMERA
+endif # MSMB_CAMERA && !MACH_BQ_VEGETALTE_LP
+
+if (MSMB_CAMERA && MACH_BQ_VEGETALTE_LP)
+source "drivers/media/platform/msm/camera_v2_vegetalte/Kconfig"
+endif # MSMB_CAMERA && MACH_BQ_VEGETALTE_LP
 
 source "drivers/media/platform/msm/vidc/Kconfig"
 source "drivers/media/platform/msm/wfd/Kconfig"
