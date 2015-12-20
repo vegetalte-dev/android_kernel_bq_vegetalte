@@ -1085,6 +1085,18 @@ static void *def_msm8x16_wcd_mbhc_cal(void)
 	 * all btn_low corresponds to threshold for current source
 	 * all bt_high corresponds to threshold for Micbias
 	 */
+#if defined(CONFIG_L8700_COMMON)
+	btn_low[0] = 75;	// BTN_0
+	btn_high[0] = 75;
+	btn_low[1] = 100;	// BTN_1	
+	btn_high[1] = 100;
+	btn_low[2] = 120;	// BTN_2	
+	btn_high[2] = 120;
+	btn_low[3] = 180; //350;	// BTN_3
+	btn_high[3] = 180; //350;
+	btn_low[4] = 500; //475;	// BTN_4	
+	btn_high[4] = 500; //475;
+#else
 	btn_low[0] = 25;
 	btn_high[0] = 25;
 	btn_low[1] = 50;
@@ -1095,7 +1107,7 @@ static void *def_msm8x16_wcd_mbhc_cal(void)
 	btn_high[3] = 112;
 	btn_low[4] = 137;
 	btn_high[4] = 137;
-
+#endif
 	return msm8x16_wcd_cal;
 }
 
