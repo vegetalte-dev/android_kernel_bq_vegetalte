@@ -1272,6 +1272,7 @@ static int msm_eeprom_platform_probe(struct platform_device *pdev)
 			e_ctrl->cal_data.mapdata[j]);
 	if( (eb_info->eeprom_name != NULL) 
 		&& (   (strcmp(eb_info->eeprom_name, "truly_cm9886qr") == 0)
+			|| (strcmp(eb_info->eeprom_name, "imx214_cma846") == 0)
 		) )
 	{
 		CDBG("imx214 name = %s\n",eb_info->eeprom_name);
