@@ -1263,6 +1263,21 @@ static void mdss_fb_stop_disp_thread(struct msm_fb_data_type *mfd)
 	mfd->disp_thread = NULL;
 }
 
+#if defined(CONFIG_L8700_COMMON)
+static bool boot_mode_charge;
+static int __init mdss_fb_boot_mode(char *opt)
+{
+	if (!opt || !*opt)
+		return 1;
+
+	if (!strncmp(opt, "charger", 7)) {
+		boot_mode_charge = true;
+	}
+	return 1;
+}
+__setup("androidboot.mode=", mdss_fb_boot_mode);
+#endif
+
 static int mdss_fb_unblank_sub(struct msm_fb_data_type *mfd)
 {
 	int ret = 0;
@@ -1300,6 +1315,10 @@ static int mdss_fb_unblank_sub(struct msm_fb_data_type *mfd)
 				msecs_to_jiffies(mfd->idle_time));
 	}
 
+#if defined(CONFIG_L8700_COMMON)
+	if (boot_mode_charge)
+		goto error;
+#endif
 	/* Reset the backlight only if the panel was off */
 	if (mdss_panel_is_power_off(cur_power_state)) {
 		mutex_lock(&mfd->bl_lock);
@@ -1311,10 +1330,11 @@ static int mdss_fb_unblank_sub(struct msm_fb_data_type *mfd)
 			 * the backlight would remain 0 (0 is set in blank).
 			 * Hence resetting back to calibration mode value
 			 */
-			if (!IS_CALIB_MODE_BL(mfd))
+			if (!IS_CALIB_MODE_BL(mfd)) {
 				mdss_fb_set_backlight(mfd, mfd->unset_bl_level);
-			else
+			} else {
 				mdss_fb_set_backlight(mfd, mfd->calib_mode_bl);
+			}
 		}
 		mutex_unlock(&mfd->bl_lock);
 	}
@@ -1329,6 +1349,7 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
 	int ret = 0;
 	int cur_power_state, req_power_state = MDSS_PANEL_POWER_OFF;
+	u32 cur_bl = 0;
 
 	if (!mfd || !op_enable)
 		return -EPERM;
@@ -1401,9 +1422,11 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 				/* Stop Display thread */
 				if (mfd->disp_thread)
 					mdss_fb_stop_disp_thread(mfd);
+				cur_bl = mfd->bl_level;
 				mutex_lock(&mfd->bl_lock);
 				mdss_fb_set_backlight(mfd, 0);
 				mfd->bl_updated = 0;
+				mfd->unset_bl_level = cur_bl;
 				mutex_unlock(&mfd->bl_lock);
 			}
 			mfd->panel_power_state = req_power_state;
