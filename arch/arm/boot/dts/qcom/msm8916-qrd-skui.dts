@@ -44,24 +44,32 @@
 			qcom,fg-batt-capacity-mah = <2850>;
 			qcom,fg-cc-soc-coeff = <0x81C0>;
 			qcom,fg-delta-soc = <1>;
+			qcom,fg-soc-min = <3>;
 
-			qcom,fg-cutoff-voltage-mv = <3450>;
+			qcom,fg-cutoff-voltage-mv = <3400>;
 			qcom,fg-iterm-ma = <100>;
 			qcom,fg-ibatt-standby-ma = <200>;
 			qcom,fg-cc-to-cv-mv = <4328>;
-			qcom,thermistor-c1-coeff = <0x86C8>;
+			qcom,thermistor-c1-coeff = <0x86C2>;
 
 			qcom,float-voltage-mv = <4350>;
 			qcom,iterm-ma = <100>;
-			//qcom,charging-timeout = <384>;
+			qcom,charging-timeout = <768>;
 			qcom,fg-reset-at-pon;
 			qcom,fg-reset-thresold-mv = <200>;
 			qcom,otg-batt-curr-limit = <1500>;
 			qcom,recharge-thresh-mv = <100>;
 			qcom,thermal-mitigation = <1500 700 600 0>;
 			qcom,fg-auto-recharge-soc = <99>;
-			regulator-name = "smb1360_otg_vreg";
 			qcom,empty-soc-disabled;
+			regulator-name = "smb1360_otg_vreg";
+			qcom,awake-min-soc;
+			qcom,cfg-current-limited = <1200>;
+			qcom,bat-ovp-end-chg-disabled;
+
+			qcom,otp-hard-jeita-config;
+			qcom,otp-hot-bat-decidegc = <500>;
+			qcom,otp-cold-bat-decidegc = <(-50)>;
 		};
 	};
 
