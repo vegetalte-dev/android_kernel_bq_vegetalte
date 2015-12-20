@@ -104,11 +104,7 @@ enum msm_usb_phy_type {
 	SNPS_FEMTO_PHY,
 };
 
-#ifdef CONFIG_L8700_COMMON
-#define IDEV_CHG_MAX    1100
-#else
 #define IDEV_CHG_MAX	1500
-#endif
 #define IDEV_CHG_MIN	500
 #define IUNIT		100
 
@@ -302,9 +298,7 @@ struct msm_otg_platform_data {
 	bool enable_ahb2ahb_bypass;
 	bool disable_retention_with_vdd_min;
 	int usb_id_gpio;
-#ifdef CONFIG_L8700_COMMON
-        int usbid_switch;
-#endif
+	int usbid_switch;
 	bool phy_dvdd_always_on;
 	struct clk *system_clk;
 };
