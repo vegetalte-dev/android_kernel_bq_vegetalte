@@ -1015,7 +1015,8 @@ int mdss_dsi_reg_status_check(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	}
 
 	mdss_dsi_clk_ctrl(ctrl_pdata, DSI_ALL_CLKS, 0);
-	pr_debug("%s: Read register done with ret: %d\n", __func__, ret);
+	pr_debug("%s: check reg value done, value=0x%x, ret=%d\n",
+		    __func__, ctrl_pdata->status_buf.data[0], ret);
 
 	return ret;
 }

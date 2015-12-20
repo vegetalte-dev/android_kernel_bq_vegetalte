@@ -89,7 +89,11 @@ static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 	pr_debug("%s: ndx=%d level=%d duty=%d\n", __func__,
 					ctrl->ndx, level, duty);
 
+#if defined(CONFIG_L8700_COMMON)
+	if (level == 10) {
+#else
 	if (ctrl->pwm_period >= USEC_PER_SEC) {
+#endif
 		ret = pwm_config_us(ctrl->pwm_bl, duty, ctrl->pwm_period);
 		if (ret) {
 			pr_err("%s: pwm_config_us() failed err=%d.\n",
@@ -357,7 +361,7 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
 			gpio_free(ctrl_pdata->disp_en_gpio);
 		}
-		gpio_set_value((ctrl_pdata->rst_gpio), 0);
+		gpio_set_value((ctrl_pdata->rst_gpio), 1);
 		gpio_free(ctrl_pdata->rst_gpio);
 		if (gpio_is_valid(ctrl_pdata->mode_gpio))
 			gpio_free(ctrl_pdata->mode_gpio);
@@ -605,6 +609,13 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	if(bl_level==0 || (old_bl_level==0 && bl_level!=0)){
 		pr_info("%s, bl_level=%d\n",__func__,bl_level);
 	}
+
+#if defined(CONFIG_L8700_COMMON)
+	if(old_bl_level==0 && bl_level != 0)
+	{
+		msleep(68);
+	}
+#endif
 
 #ifdef CONFIG_FTS_GESTURE
 	if(old_bl_level==0 && bl_level != 0)
@@ -1617,6 +1628,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		"qcom,mdss-dsi-rx-eot-ignore");
 	pinfo->mipi.tx_eot_append = of_property_read_bool(np,
 		"qcom,mdss-dsi-tx-eot-append");
+	pr_info("%s: tx_eot_append = %d\n", __func__, pinfo->mipi.tx_eot_append);
 
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-stream", &tmp);
 	pinfo->mipi.stream = (!rc ? tmp : 0);
